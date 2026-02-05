@@ -1,0 +1,187 @@
+import { createJiraClient } from '~/server/utils/jira';
+import type { Ticket, User, StatusChange, StateSegment } from '~/types';
+
+export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig();
+  const query = getQuery(event);
+
+  // Get query parameters
+  const startDate = (query.startDate as string) || new Date().toISOString();
+  const endDate = (query.endDate as string) || new Date().toISOString();
+  const users = query.users ? (query.users as string).split(',') : [];
+
+  if (!config.jiraBaseUrl || !config.jiraEmail || !config.jiraApiToken) {
+    throw createError({
+      statusCode: 500,
+      message:
+        'JIRA configuration is missing. Please set JIRA_BASE_URL, JIRA_EMAIL, and JIRA_API_TOKEN environment variables.',
+    });
+  }
+
+  try {
+    const jiraClient = createJiraClient(config);
+
+    // Build JQL query - filter by board if configured
+    let jql = '';
+
+    if (config.jiraBoard) {
+      // Support both project key and board ID
+      const boardFilter = config.jiraBoard.includes('-')
+        ? `project = "${config.jiraBoard.split('-')[0]}"` // Extract project key
+        : `project = "${config.jiraBoard}"`;
+      jql = boardFilter;
+    }
+
+    // Add date filter - get tickets created, updated, or with status changes in date range
+    const dateFilter = `(created >= "${startDate}" OR updated >= "${startDate}" OR status changed DURING ("${startDate}", "${endDate}"))`;
+
+    if (jql) {
+      jql += ` AND ${dateFilter}`;
+    } else {
+      jql = dateFilter;
+    }
+
+    // Add user filter if provided
+    if (users.length > 0) {
+      const userFilter = users.map((u) => `"${u}"`).join(', ');
+      jql += ` AND assignee in (${userFilter})`;
+    }
+
+    jql += ' ORDER BY updated DESC';
+
+    // Fetch issues
+    const response = await jiraClient.searchIssues(jql, [
+      'summary',
+      'assignee',
+      'status',
+      'created',
+      'updated',
+      'description',
+      'customfield_10028', // Story points
+    ]);
+
+    // Helper function to get status color
+    const getStatusColor = (status: string): string => {
+      const statusColors: Record<string, string> = {
+        'To Do': '#94a3b8',
+        'In Progress': '#3b82f6',
+        Done: '#10b981',
+      };
+      return statusColors[status] || '#8b5cf6';
+    };
+
+    // Helper function to calculate state segments from status history
+    const calculateStateSegments = (
+      trackedHistory: StatusChange[]
+    ): StateSegment[] => {
+      const segments: StateSegment[] = [];
+
+      for (let i = 0; i < trackedHistory.length; i++) {
+        const change = trackedHistory[i];
+        const nextChange = trackedHistory[i + 1];
+
+        // If there's a next change, use that as the end date
+        let segmentEndDate = nextChange ? nextChange.timestamp : null;
+
+        // If this is the last segment and it's "Done", set end date to the completion date
+        // A "Done" status means the ticket is complete and should not extend indefinitely
+        if (!nextChange && change.status === 'Done') {
+          segmentEndDate = change.timestamp;
+        }
+
+        segments.push({
+          status: change.status,
+          startDate: change.timestamp,
+          endDate: segmentEndDate,
+          color: getStatusColor(change.status),
+        });
+      }
+
+      return segments;
+    };
+
+    // Transform issues to Ticket format
+    const tickets: Ticket[] = response.issues.map((issue: any) => {
+      const assignee: User = issue.fields.assignee
+        ? {
+            id: issue.fields.assignee.accountId,
+            name: issue.fields.assignee.displayName,
+            email: issue.fields.assignee.emailAddress || '',
+            avatarUrl: issue.fields.assignee.avatarUrls?.['48x48'],
+          }
+        : {
+            id: 'unassigned',
+            name: 'Unassigned',
+            email: '',
+          };
+
+      // Get all status history (for full display)
+      const statusHistory = jiraClient.parseStatusHistory(issue);
+
+      // Get filtered and normalized status history (tracked states only)
+      const trackedHistory = jiraClient.parseTrackedStatusHistory(issue);
+      const storyPoints = jiraClient.getStoryPoints(issue);
+      const pointsHistory = jiraClient.parsePointsHistory(issue);
+
+      // Calculate state segments for timeline visualization
+      const stateSegments = calculateStateSegments(trackedHistory);
+
+      // Determine overall start/end dates
+      let ticketStartDate = new Date(issue.fields.created);
+      let ticketEndDate: Date | null = null;
+
+      if (trackedHistory.length > 0) {
+        // Start date is when ticket first entered a tracked state
+        ticketStartDate = trackedHistory[0].timestamp;
+
+        // End date is when ticket reached "Done" state
+        const doneSegment = stateSegments.find((seg) => seg.status === 'Done');
+        if (doneSegment) {
+          ticketEndDate = doneSegment.startDate;
+        }
+      }
+
+      // Normalize current status
+      const normalizedCurrentStatus =
+        jiraClient.normalizeStatus(issue.fields.status.name) ||
+        issue.fields.status.name;
+
+      return {
+        key: issue.key,
+        title: issue.fields.summary,
+        points: storyPoints,
+        pointsHistory,
+        assignee,
+        startDate: ticketStartDate,
+        endDate: ticketEndDate,
+        statusHistory,
+        currentStatus: normalizedCurrentStatus,
+        stateSegments,
+        prs: [], // Will be populated by the aggregation layer
+        description: issue.fields.description,
+        jiraUrl: `${config.jiraBaseUrl}/browse/${issue.key}`,
+      };
+    });
+
+    // Filter out tickets that have only ever been in "To Do" status
+    // Keep tickets that have had at least one status other than "To Do"
+    const filteredTickets = tickets.filter((ticket) => {
+      const hasNonToDoStatus =
+        ticket.statusHistory.length > 0
+          ? ticket.statusHistory.some((sh) => sh.status !== 'To Do')
+          : ticket.currentStatus !== 'To Do';
+      return hasNonToDoStatus;
+    });
+
+    return {
+      tickets: filteredTickets,
+      total: filteredTickets.length,
+    };
+  } catch (error: any) {
+    console.error('JIRA API Error:', error);
+    throw createError({
+      statusCode: 500,
+      message: `Failed to fetch JIRA tickets: ${error.message}`,
+    });
+  }
+});
