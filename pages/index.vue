@@ -44,9 +44,62 @@
       <div
         class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6"
       >
+        <!-- View Mode Selector -->
+        <div class="mb-4 flex items-center justify-center gap-2">
+          <button
+            v-for="mode in [
+              { value: '1week', label: '1 Week' },
+              { value: '2weeks', label: '2 Weeks' },
+              { value: '1month', label: '1 Month' },
+              { value: 'custom', label: 'Custom' },
+            ]"
+            :key="mode.value"
+            @click="viewMode = mode.value"
+            class="px-4 py-2 text-sm font-medium rounded-md transition-colors"
+            :class="{
+              'bg-blue-600 text-white': viewMode === mode.value,
+              'bg-gray-100 text-gray-700 hover:bg-gray-200':
+                viewMode !== mode.value,
+            }"
+          >
+            {{ mode.label }}
+          </button>
+        </div>
+
+        <!-- Custom Date Inputs -->
+        <div
+          v-if="viewMode === 'custom'"
+          class="mb-4 flex items-center justify-center gap-4"
+        >
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1"
+              >Start Date</label
+            >
+            <input
+              type="date"
+              :value="customStartDate.toISOString().split('T')[0]"
+              @change="handleStartDateChange"
+              class="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1"
+              >End Date</label
+            >
+            <input
+              type="date"
+              :value="customEndDate.toISOString().split('T')[0]"
+              @change="handleEndDateChange"
+              class="block rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            />
+          </div>
+        </div>
+
+        <!-- Date Range Navigation -->
         <div class="flex items-center justify-between">
           <button
-            @click="goToPreviousWeek"
+            v-if="viewMode !== 'custom'"
+            @click="goToPreviousPeriod"
             class="btn-secondary flex items-center gap-2"
           >
             <svg
@@ -62,13 +115,14 @@
                 d="M15 19l-7-7 7-7"
               />
             </svg>
-            Previous Week
+            Previous
           </button>
+          <div v-else></div>
 
           <div class="text-center">
             <div class="text-lg font-semibold text-gray-900">
-              {{ formatDate(weekRange.start, 'MMM d') }} -
-              {{ formatDate(weekRange.end, 'MMM d, yyyy') }}
+              {{ formatDate(dateRange.start, 'MMM d') }} -
+              {{ formatDate(dateRange.end, 'MMM d, yyyy') }}
             </div>
             <button
               @click="goToToday"
@@ -79,10 +133,11 @@
           </div>
 
           <button
-            @click="goToNextWeek"
+            v-if="viewMode !== 'custom'"
+            @click="goToNextPeriod"
             class="btn-secondary flex items-center gap-2"
           >
-            Next Week
+            Next
             <svg
               class="w-4 h-4"
               fill="none"
@@ -97,6 +152,7 @@
               />
             </svg>
           </button>
+          <div v-else></div>
         </div>
       </div>
 
@@ -272,8 +328,8 @@
       <CalendarWeek
         v-else
         :user-tickets="filteredUserTickets"
-        :current-date="currentDate"
-        :week-starts-on="weekStartsOn"
+        :start-date="dateRange.start"
+        :end-date="dateRange.end"
         @ticket-click="openTicketModal"
       />
     </main>
@@ -302,7 +358,23 @@ const {
   error,
 } = useTicketData();
 const { statusConfigs, weekStartsOn } = useConfig();
-const { formatDate, nextWeek, previousWeek, getWeekRange } = useDateUtils();
+const {
+  formatDate,
+  nextWeek,
+  previousWeek,
+  getWeekRange,
+  nextPeriod,
+  previousPeriod,
+  startOfMonth,
+  endOfMonth,
+} = useDateUtils();
+const { addWeeks, endOfWeek } = await import('date-fns');
+
+// View mode state
+type ViewMode = '1week' | '2weeks' | '1month' | 'custom';
+const viewMode = ref<ViewMode>('1week');
+const customStartDate = ref<Date>(new Date());
+const customEndDate = ref<Date>(new Date());
 
 // Current date state
 const currentDate = ref(new Date());
@@ -352,6 +424,31 @@ const weekRange = computed(() =>
   getWeekRange(currentDate.value, weekStartsOn.value)
 );
 
+// Generalized date range based on view mode
+const dateRange = computed(() => {
+  switch (viewMode.value) {
+    case '1week':
+      return getWeekRange(currentDate.value, weekStartsOn.value);
+    case '2weeks': {
+      const start = weekRange.value.start;
+      const end = endOfWeek(addWeeks(start, 1), {
+        weekStartsOn: weekStartsOn.value,
+      });
+      return { start, end };
+    }
+    case '1month':
+      return {
+        start: startOfMonth(currentDate.value),
+        end: endOfMonth(currentDate.value),
+      };
+    case 'custom':
+      return {
+        start: customStartDate.value,
+        end: customEndDate.value,
+      };
+  }
+});
+
 // Week navigation
 const goToPreviousWeek = () => {
   currentDate.value = previousWeek(currentDate.value);
@@ -361,13 +458,33 @@ const goToNextWeek = () => {
   currentDate.value = nextWeek(currentDate.value);
 };
 
+// Period navigation (generalized)
+const goToPreviousPeriod = () => {
+  currentDate.value = previousPeriod(currentDate.value, viewMode.value);
+};
+
+const goToNextPeriod = () => {
+  currentDate.value = nextPeriod(currentDate.value, viewMode.value);
+};
+
 const goToToday = () => {
   currentDate.value = new Date();
 };
 
+// Custom date handlers
+const handleStartDateChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  customStartDate.value = new Date(target.value);
+};
+
+const handleEndDateChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  customEndDate.value = new Date(target.value);
+};
+
 // Refresh data
 const refreshData = async () => {
-  await fetchData(weekRange.value.start, weekRange.value.end);
+  await fetchData(dateRange.value.start, dateRange.value.end);
 };
 
 // Ticket modal
@@ -393,7 +510,7 @@ const closeTicketModal = () => {
 
 // Watch for date changes and refetch
 watch(
-  () => weekRange.value,
+  () => dateRange.value,
   async () => {
     await refreshData();
   },

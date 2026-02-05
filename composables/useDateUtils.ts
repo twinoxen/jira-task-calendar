@@ -8,6 +8,10 @@ import {
   isSameDay,
   addWeeks,
   subWeeks,
+  addMonths,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
 } from 'date-fns';
 
 export const useDateUtils = () => {
@@ -74,14 +78,57 @@ export const useDateUtils = () => {
     return subWeeks(date, 1);
   };
 
+  const getDateRange = (start: Date, end: Date): Date[] => {
+    const days: Date[] = [];
+    let current = new Date(start);
+    while (current <= end) {
+      days.push(new Date(current));
+      current = addDays(current, 1);
+    }
+    return days;
+  };
+
+  type ViewMode = '1week' | '2weeks' | '1month' | 'custom';
+
+  const nextPeriod = (date: Date, mode: ViewMode): Date => {
+    switch (mode) {
+      case '1week':
+        return addWeeks(date, 1);
+      case '2weeks':
+        return addWeeks(date, 2);
+      case '1month':
+        return addMonths(date, 1);
+      default:
+        return date;
+    }
+  };
+
+  const previousPeriod = (date: Date, mode: ViewMode): Date => {
+    switch (mode) {
+      case '1week':
+        return subWeeks(date, 1);
+      case '2weeks':
+        return subWeeks(date, 2);
+      case '1month':
+        return subMonths(date, 1);
+      default:
+        return date;
+    }
+  };
+
   return {
     getWeekDays,
     getWeekRange,
+    getDateRange,
     formatDate,
     formatDayOfWeek,
     formatDayOfMonth,
     calculateTicketSpan,
     nextWeek,
     previousWeek,
+    nextPeriod,
+    previousPeriod,
+    startOfMonth,
+    endOfMonth,
   };
 };
