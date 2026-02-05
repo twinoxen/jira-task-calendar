@@ -152,10 +152,18 @@ export class GitHubClient {
   transformToPullRequest(pr: any): PullRequest {
     const ticketKeys = this.extractTicketKeys(`${pr.title} ${pr.body || ''}`);
 
+    // Extract repo name from various sources
+    const repo =
+      pr.base?.repo?.name ||
+      pr.repository_url?.split('/').pop() ||
+      pr.html_url?.match(/github\.com\/[^/]+\/([^/]+)/)?.[1] ||
+      undefined;
+
     return {
       number: pr.number,
       title: pr.title,
       url: pr.html_url,
+      repo,
       author: pr.user?.login || 'unknown',
       authorAvatarUrl: pr.user?.avatar_url,
       createdAt: new Date(pr.created_at),
@@ -167,7 +175,37 @@ export class GitHubClient {
         ? 'closed'
         : 'open',
       linkedTicketKeys: ticketKeys,
+      // These fields are only present when fetching individual PR details
+      additions: pr.additions,
+      deletions: pr.deletions,
+      changedFiles: pr.changed_files,
     };
+  }
+
+  /**
+   * Enrich a PullRequest with stats (additions, deletions, changed files)
+   * by fetching the full PR details from the GitHub API.
+   */
+  async enrichPRWithStats(pr: PullRequest): Promise<PullRequest> {
+    if (pr.additions !== undefined && pr.deletions !== undefined) {
+      return pr; // Already has stats
+    }
+
+    try {
+      const repo = pr.repo || pr.url?.match(/github\.com\/[^/]+\/([^/]+)/)?.[1];
+      if (!repo) return pr;
+
+      const fullPr = await this.getPullRequest(this.org, repo, pr.number);
+      return {
+        ...pr,
+        additions: fullPr.additions,
+        deletions: fullPr.deletions,
+        changedFiles: fullPr.changed_files,
+      };
+    } catch (error) {
+      console.error(`Failed to enrich PR #${pr.number} with stats:`, error);
+      return pr;
+    }
   }
 }
 

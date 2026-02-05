@@ -285,6 +285,33 @@
                             {{ formatDate(pr.mergedAt, 'MMM d, yyyy') }}</span
                           >
                         </div>
+                        <!-- Lines added/deleted stats -->
+                        <div
+                          v-if="
+                            pr.additions !== undefined ||
+                            pr.deletions !== undefined
+                          "
+                          class="flex items-center gap-3 mt-1.5 text-xs"
+                        >
+                          <span
+                            v-if="pr.additions !== undefined"
+                            class="text-green-600 font-medium"
+                            >+{{ pr.additions.toLocaleString() }}</span
+                          >
+                          <span
+                            v-if="pr.deletions !== undefined"
+                            class="text-red-600 font-medium"
+                            >-{{ pr.deletions.toLocaleString() }}</span
+                          >
+                          <span
+                            v-if="pr.changedFiles !== undefined"
+                            class="text-gray-500"
+                          >
+                            {{ pr.changedFiles }}
+                            {{ pr.changedFiles === 1 ? 'file' : 'files' }}
+                            changed
+                          </span>
+                        </div>
                       </div>
                       <svg
                         class="w-5 h-5 text-gray-400 flex-shrink-0"

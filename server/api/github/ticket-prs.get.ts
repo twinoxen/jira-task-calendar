@@ -37,10 +37,15 @@ export default defineEventHandler(async (event) => {
       .map((pr) => githubClient.transformToPullRequest(pr))
       .filter((pr) => pr.linkedTicketKeys.includes(ticketKey.toUpperCase()));
 
+    // Enrich matched PRs with stats (additions, deletions, changed files)
+    const enrichedPrs = await Promise.all(
+      matchingPrs.map((pr) => githubClient.enrichPRWithStats(pr))
+    );
+
     return {
       ticketKey,
-      pullRequests: matchingPrs,
-      total: matchingPrs.length,
+      pullRequests: enrichedPrs,
+      total: enrichedPrs.length,
     };
   } catch (error: any) {
     console.error('GitHub Ticket PRs API Error:', error);

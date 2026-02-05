@@ -17,6 +17,7 @@ export interface PullRequest {
   number: number;
   title: string;
   url: string;
+  repo?: string;
   author: string;
   authorAvatarUrl?: string;
   createdAt: Date;
@@ -24,6 +25,9 @@ export interface PullRequest {
   closedAt?: Date;
   status: 'open' | 'merged' | 'closed';
   linkedTicketKeys: string[];
+  additions?: number;
+  deletions?: number;
+  changedFiles?: number;
 }
 
 export interface StateSegment {
