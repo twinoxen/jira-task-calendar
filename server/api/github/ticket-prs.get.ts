@@ -1,11 +1,12 @@
 import { createGitHubClient } from '~/server/utils/github';
-import type { PullRequest } from '~/types';
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
   const query = getQuery(event);
 
   const ticketKey = query.ticketKey as string;
+  const since = query.since as string;
+  const until = query.until as string;
 
   if (!ticketKey) {
     throw createError({
@@ -15,21 +16,23 @@ export default defineEventHandler(async (event) => {
   }
 
   if (!config.githubToken || !config.githubOrg) {
-    throw createError({
-      statusCode: 500,
-      message: 'GitHub configuration is missing',
-    });
+    // GitHub not configured — return empty results silently
+    return {
+      ticketKey,
+      pullRequests: [],
+      total: 0,
+    };
   }
 
   try {
     const githubClient = createGitHubClient(config);
 
-    // Search for PRs that mention this ticket key
-    // We'll search for the last 30 days to get a reasonable scope
-    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const allPrs = await githubClient.searchPullRequests(since);
+    // Search all PRs within the ticket's active timespan
+    const sinceDate =
+      since || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+    const allPrs = await githubClient.searchPullRequests(sinceDate);
 
-    // Filter PRs that contain the ticket key
+    // Filter PRs that contain the ticket key in title or body
     const matchingPrs = allPrs
       .map((pr) => githubClient.transformToPullRequest(pr))
       .filter((pr) => pr.linkedTicketKeys.includes(ticketKey.toUpperCase()));

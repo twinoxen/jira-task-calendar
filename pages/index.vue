@@ -282,6 +282,7 @@
     <TicketDetailModal
       :is-open="isModalOpen"
       :ticket="selectedTicket"
+      :loading-prs="loadingPRs"
       @close="closeTicketModal"
     />
   </div>
@@ -291,8 +292,15 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import type { Ticket } from '~/types';
 
-const { fetchData, userTickets, tickets, totalPoints, loading, error } =
-  useTicketData();
+const {
+  fetchData,
+  fetchTicketPRs,
+  userTickets,
+  tickets,
+  totalPoints,
+  loading,
+  error,
+} = useTicketData();
 const { statusConfigs, weekStartsOn } = useConfig();
 const { formatDate, nextWeek, previousWeek, getWeekRange } = useDateUtils();
 
@@ -363,9 +371,19 @@ const refreshData = async () => {
 };
 
 // Ticket modal
-const openTicketModal = (ticket: Ticket) => {
+const loadingPRs = ref(false);
+
+const openTicketModal = async (ticket: Ticket) => {
   selectedTicket.value = ticket;
   isModalOpen.value = true;
+
+  // Fetch PRs on-demand when modal opens
+  loadingPRs.value = true;
+  try {
+    await fetchTicketPRs(ticket);
+  } finally {
+    loadingPRs.value = false;
+  }
 };
 
 const closeTicketModal = () => {

@@ -58,6 +58,74 @@ export class GitHubClient {
     return allPRs;
   }
 
+  async searchPullRequestsByAuthor(
+    since: string,
+    author?: string,
+    until?: string
+  ): Promise<any[]> {
+    const targetRepos = this.repos;
+    const sinceDate = new Date(since).toISOString().split('T')[0];
+
+    if (targetRepos.length === 0) {
+      // Search across the entire org
+      let query = `org:${this.org} is:pr created:>=${sinceDate}`;
+      if (author) {
+        query += ` author:${author}`;
+      }
+      if (until) {
+        const untilDate = new Date(until).toISOString().split('T')[0];
+        query = query.replace(
+          `created:>=${sinceDate}`,
+          `created:${sinceDate}..${untilDate}`
+        );
+      }
+
+      try {
+        const response = await this.octokit.search.issuesAndPullRequests({
+          q: query,
+          per_page: 100,
+          sort: 'created',
+          order: 'desc',
+        });
+        return response.data.items;
+      } catch (error) {
+        console.error('GitHub search error:', error);
+        return [];
+      }
+    }
+
+    // Search specific repos — filter by author and date client-side
+    const allPRs: any[] = [];
+    for (const repo of targetRepos) {
+      try {
+        const response = await this.octokit.pulls.list({
+          owner: this.org,
+          repo,
+          state: 'all',
+          sort: 'created',
+          direction: 'desc',
+          per_page: 100,
+        });
+
+        const filtered = response.data.filter((pr) => {
+          const createdAt = new Date(pr.created_at);
+          const sinceCheck = createdAt >= new Date(since);
+          const untilCheck = until ? createdAt <= new Date(until) : true;
+          const authorCheck = author
+            ? pr.user?.login?.toLowerCase() === author.toLowerCase()
+            : true;
+          return sinceCheck && untilCheck && authorCheck;
+        });
+
+        allPRs.push(...filtered);
+      } catch (error) {
+        console.error(`GitHub error for repo ${repo}:`, error);
+      }
+    }
+
+    return allPRs;
+  }
+
   async getPullRequest(
     owner: string,
     repo: string,

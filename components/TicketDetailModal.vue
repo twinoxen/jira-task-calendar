@@ -197,11 +197,38 @@
               <!-- Linked Pull Requests -->
               <div class="mb-4">
                 <h4 class="text-sm font-semibold text-gray-500 uppercase mb-3">
-                  Linked Pull Requests ({{ ticket.prs.length }})
+                  Linked Pull Requests
+                  <span v-if="!loadingPrs">({{ ticket.prs.length }})</span>
                 </h4>
 
                 <div
-                  v-if="ticket.prs.length === 0"
+                  v-if="loadingPrs"
+                  class="flex items-center gap-2 text-sm text-gray-500"
+                >
+                  <svg
+                    class="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    />
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  Searching for pull requests...
+                </div>
+
+                <div
+                  v-else-if="ticket.prs.length === 0"
                   class="text-sm text-gray-500 italic"
                 >
                   No pull requests linked to this ticket
@@ -319,6 +346,7 @@ import type { Ticket } from '~/types';
 const props = defineProps<{
   isOpen: boolean;
   ticket: Ticket | null;
+  loadingPrs?: boolean;
 }>();
 
 const emit = defineEmits<{

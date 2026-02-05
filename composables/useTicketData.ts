@@ -30,11 +30,10 @@ export const useTicketData = () => {
         params.append('users', users.join(','));
       }
 
-      // Fetch tickets and PRs in parallel
-      const [ticketsResponse, prsResponse] = await Promise.all([
-        $fetch(`/api/jira/tickets?${params.toString()}`),
-        $fetch(`/api/github/prs?since=${startDateStr}`),
-      ]);
+      // Fetch tickets (PRs are fetched on-demand when modal opens)
+      const ticketsResponse = await $fetch(
+        `/api/jira/tickets?${params.toString()}`
+      );
 
       // Convert date strings to Date objects
       tickets.value = (ticketsResponse as any).tickets.map((ticket: any) => ({
@@ -56,16 +55,10 @@ export const useTicketData = () => {
         })),
       }));
 
-      pullRequests.value = (prsResponse as any).pullRequests.map((pr: any) => ({
-        ...pr,
-        createdAt: new Date(pr.createdAt),
-        updatedAt: new Date(pr.updatedAt),
-        mergedAt: pr.mergedAt ? new Date(pr.mergedAt) : null,
-        closedAt: pr.closedAt ? new Date(pr.closedAt) : null,
-      }));
-
-      // Match PRs to tickets
-      matchPullRequests();
+      // Initialize empty PRs for all tickets
+      for (const ticket of tickets.value) {
+        ticket.prs = [];
+      }
     } catch (err: any) {
       error.value = err;
       console.error('Error fetching data:', err);
@@ -74,22 +67,41 @@ export const useTicketData = () => {
     }
   };
 
-  const matchPullRequests = () => {
-    // Create a map of ticket key to PRs
-    const prsByTicket = new Map<string, PullRequest[]>();
+  const fetchTicketPRs = async (ticket: Ticket): Promise<PullRequest[]> => {
+    try {
+      const params = new URLSearchParams({
+        ticketKey: ticket.key,
+      });
 
-    for (const pr of pullRequests.value) {
-      for (const ticketKey of pr.linkedTicketKeys) {
-        if (!prsByTicket.has(ticketKey)) {
-          prsByTicket.set(ticketKey, []);
-        }
-        prsByTicket.get(ticketKey)!.push(pr);
+      // Use the ticket's active timespan
+      if (ticket.startDate) {
+        params.append('since', ticket.startDate.toISOString());
       }
-    }
+      if (ticket.endDate) {
+        // Add a buffer of a few days after completion for late PRs
+        const buffer = new Date(ticket.endDate);
+        buffer.setDate(buffer.getDate() + 7);
+        params.append('until', buffer.toISOString());
+      }
 
-    // Attach PRs to tickets
-    for (const ticket of tickets.value) {
-      ticket.prs = prsByTicket.get(ticket.key) || [];
+      const response = await $fetch(
+        `/api/github/ticket-prs?${params.toString()}`
+      ) as any;
+
+      const prs: PullRequest[] = response.pullRequests.map((pr: any) => ({
+        ...pr,
+        createdAt: new Date(pr.createdAt),
+        mergedAt: pr.mergedAt ? new Date(pr.mergedAt) : null,
+        closedAt: pr.closedAt ? new Date(pr.closedAt) : null,
+      }));
+
+      // Also update the ticket in the tickets array
+      ticket.prs = prs;
+
+      return prs;
+    } catch (err: any) {
+      console.error(`Error fetching PRs for ${ticket.key}:`, err);
+      return [];
     }
   };
 
@@ -154,6 +166,7 @@ export const useTicketData = () => {
     loading,
     error,
     fetchData,
+    fetchTicketPRs,
     userTickets,
     totalPoints,
     ticketsByStatus,
