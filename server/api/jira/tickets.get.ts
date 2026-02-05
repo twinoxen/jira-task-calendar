@@ -9,6 +9,7 @@ export default defineEventHandler(async (event) => {
   const startDate = (query.startDate as string) || new Date().toISOString();
   const endDate = (query.endDate as string) || new Date().toISOString();
   const users = query.users ? (query.users as string).split(',') : [];
+  const projectKey = (query.project as string) || config.jiraBoard || '';
 
   if (!config.jiraBaseUrl || !config.jiraEmail || !config.jiraApiToken) {
     throw createError({
@@ -21,14 +22,14 @@ export default defineEventHandler(async (event) => {
   try {
     const jiraClient = createJiraClient(config);
 
-    // Build JQL query - filter by board if configured
+    // Build JQL query - filter by project
     let jql = '';
 
-    if (config.jiraBoard) {
+    if (projectKey) {
       // Support both project key and board ID
-      const boardFilter = config.jiraBoard.includes('-')
-        ? `project = "${config.jiraBoard.split('-')[0]}"` // Extract project key
-        : `project = "${config.jiraBoard}"`;
+      const boardFilter = projectKey.includes('-')
+        ? `project = "${projectKey.split('-')[0]}"` // Extract project key
+        : `project = "${projectKey}"`;
       jql = boardFilter;
     }
 

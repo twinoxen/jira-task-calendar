@@ -10,7 +10,8 @@ export const useTicketData = () => {
   const fetchData = async (
     startDate: Date,
     endDate: Date,
-    users?: string[]
+    users?: string[],
+    project?: string
   ) => {
     loading.value = true;
     error.value = null;
@@ -28,6 +29,10 @@ export const useTicketData = () => {
 
       if (users && users.length > 0) {
         params.append('users', users.join(','));
+      }
+
+      if (project) {
+        params.append('project', project);
       }
 
       // Fetch tickets (PRs are fetched on-demand when modal opens)
@@ -84,9 +89,9 @@ export const useTicketData = () => {
         params.append('until', buffer.toISOString());
       }
 
-      const response = await $fetch(
+      const response = (await $fetch(
         `/api/github/ticket-prs?${params.toString()}`
-      ) as any;
+      )) as any;
 
       const prs: PullRequest[] = response.pullRequests.map((pr: any) => ({
         ...pr,

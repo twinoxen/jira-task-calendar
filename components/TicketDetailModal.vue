@@ -371,7 +371,8 @@ const activeDays = computed(() => {
       const diff = Math.ceil(
         (segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)
       );
-      total += Math.max(diff, 0);
+      // Count at least 1 day if worked on (even if started & completed same day)
+      total += Math.max(diff, 1);
     }
   }
   return total;

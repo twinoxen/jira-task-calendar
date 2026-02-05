@@ -67,6 +67,15 @@ export class JiraClient {
     return this.request<any>(`/users/search?${params.toString()}`);
   }
 
+  async getProjects() {
+    const response = await this.request<any[]>('/project');
+    return response.map((project: any) => ({
+      key: project.key,
+      name: project.name,
+      id: project.id,
+    }));
+  }
+
   parseStatusHistory(issue: any): StatusChange[] {
     const changelog = issue.changelog?.histories || [];
     const statusChanges: StatusChange[] = [];
