@@ -39,6 +39,11 @@
                   >
                     {{ ticket.points }} pts
                   </span>
+                  <span
+                    class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-semibold"
+                  >
+                    {{ activeDays }}d active
+                  </span>
                 </div>
                 <h3 class="text-lg text-gray-700 font-medium">
                   {{ ticket.title }}
@@ -123,7 +128,17 @@
                   </div>
                   <div v-else class="flex items-center gap-3 text-sm">
                     <span class="text-gray-500 w-24">Status:</span>
-                    <span class="font-medium text-blue-600">In Progress</span>
+                    <span class="font-medium" :style="{ color: statusColor }">{{
+                      ticket.currentStatus
+                    }}</span>
+                  </div>
+                  <div class="flex items-center gap-3 text-sm">
+                    <span class="text-gray-500 w-24">Active Days:</span>
+                    <span
+                      class="font-semibold text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full text-xs"
+                    >
+                      {{ activeDays }} {{ activeDays === 1 ? 'day' : 'days' }}
+                    </span>
                   </div>
                 </div>
 
@@ -315,6 +330,23 @@ const { formatDate } = useDateUtils();
 
 const statusColor = computed(() => {
   return props.ticket ? getStatusColor(props.ticket.currentStatus) : '#8b5cf6';
+});
+
+const activeDays = computed(() => {
+  if (!props.ticket) return 0;
+  const now = new Date();
+  let total = 0;
+  for (const seg of props.ticket.stateSegments) {
+    if (seg.status === 'In Progress' || seg.status === 'Done') {
+      const segStart = new Date(seg.startDate);
+      const segEnd = seg.endDate ? new Date(seg.endDate) : now;
+      const diff = Math.ceil(
+        (segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      total += Math.max(diff, 0);
+    }
+  }
+  return total;
 });
 
 const getUserInitials = (name: string): string => {

@@ -86,7 +86,7 @@
             :style="{
               display: 'grid',
               gridTemplateColumns: 'repeat(7, 1fr)',
-              gridTemplateRows: `repeat(${userData.totalLanes}, 88px)`,
+              gridTemplateRows: `repeat(${userData.totalLanes}, 96px)`,
               gap: '4px 0px',
               padding: '4px 0px',
               minHeight: '64px',
@@ -130,38 +130,11 @@
               <div
                 class="px-3 pt-7 pb-1 h-full flex flex-col overflow-hidden min-w-0"
               >
-                <!-- Line 1: Ticket key + story points -->
+                <!-- Line 1: Ticket key -->
                 <div class="flex items-center gap-2">
                   <span class="text-xs font-bold text-white">{{
                     item.ticket.key
                   }}</span>
-                  <!-- Points history -->
-                  <template
-                    v-if="
-                      item.ticket.pointsHistory &&
-                      item.ticket.pointsHistory.length > 0
-                    "
-                  >
-                    <span
-                      v-for="(ph, phIdx) in item.ticket.pointsHistory"
-                      :key="'ph-' + phIdx"
-                      class="text-[10px] px-1 py-0.5 bg-white/20 rounded font-semibold text-white"
-                    >
-                      {{ ph.from ?? '–' }}
-                    </span>
-                    <span class="text-[10px] text-white/60">›</span>
-                    <span
-                      class="text-[10px] px-1 py-0.5 bg-white/30 rounded font-semibold text-white"
-                    >
-                      {{ item.ticket.points ?? '–' }} pts
-                    </span>
-                  </template>
-                  <span
-                    v-else-if="item.ticket.points"
-                    class="text-[10px] px-1 py-0.5 bg-white/20 rounded font-semibold text-white"
-                  >
-                    {{ item.ticket.points }} pts
-                  </span>
                   <!-- PR indicator -->
                   <svg
                     v-if="item.ticket.prs.length > 0"
@@ -174,6 +147,35 @@
                       d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"
                     />
                   </svg>
+                </div>
+                <!-- Line 2: Story points -->
+                <div
+                  v-if="
+                    item.ticket.pointsHistory &&
+                    item.ticket.pointsHistory.length > 0
+                  "
+                  class="flex items-center gap-1"
+                >
+                  <span
+                    v-for="(ph, phIdx) in item.ticket.pointsHistory"
+                    :key="'ph-' + phIdx"
+                    class="text-[10px] px-1 py-0.5 bg-white/20 rounded font-semibold text-white"
+                  >
+                    {{ ph.from ?? '–' }}
+                  </span>
+                  <span class="text-[10px] text-white/60">›</span>
+                  <span
+                    class="text-[10px] px-1 py-0.5 bg-white/30 rounded font-semibold text-white"
+                  >
+                    {{ item.ticket.points ?? '–' }} pts
+                  </span>
+                </div>
+                <div v-else-if="item.ticket.points">
+                  <span
+                    class="text-[10px] px-1 py-0.5 bg-white/20 rounded font-semibold text-white"
+                  >
+                    {{ item.ticket.points }} pts
+                  </span>
                 </div>
                 <!-- Line 2: Ticket title -->
                 <div class="text-sm font-medium text-white truncate mt-0.5">
@@ -210,7 +212,7 @@
                   </div>
                   <div>Assignee: {{ item.ticket.assignee.name }}</div>
                   <div class="font-semibold text-yellow-400">
-                    Total Days Open: {{ item.daysOpen }}
+                    Active Days: {{ item.daysOpen }}
                     {{ item.daysOpen === 1 ? 'day' : 'days' }}
                   </div>
                   <div class="pt-2 border-t border-gray-700">
@@ -414,11 +416,19 @@ const processedUsers = computed<ProcessedUser[]>(() => {
           }
         }
 
-        // Days open
-        const end = ticket.endDate || new Date();
-        const daysOpen = Math.ceil(
-          (end.getTime() - ticket.startDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        // Days in active development — only count time in "In Progress" or "Done" segments
+        let daysOpen = 0;
+        const now = new Date();
+        for (const seg of ticket.stateSegments) {
+          if (seg.status === 'In Progress' || seg.status === 'Done') {
+            const segStart = new Date(seg.startDate);
+            const segEnd = seg.endDate ? new Date(seg.endDate) : now;
+            const diff = Math.ceil(
+              (segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            daysOpen += Math.max(diff, 0);
+          }
+        }
 
         // Bar color = current status color
         const barColor = statusColors[ticket.currentStatus] || '#8b5cf6';

@@ -130,7 +130,8 @@ export class JiraClient {
       normalized === 'complete' ||
       normalized === 'closed' ||
       normalized === 'resolved' ||
-      normalized === 'finished'
+      normalized === 'finished' ||
+      normalized === 'abandoned'
     ) {
       return 'Done';
     }
