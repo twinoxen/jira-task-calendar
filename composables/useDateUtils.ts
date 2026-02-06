@@ -13,6 +13,43 @@ import {
   startOfMonth,
   endOfMonth,
 } from 'date-fns';
+import type { StateSegment } from '~/types';
+
+/**
+ * Calculate the number of unique calendar days a ticket was in "In Progress" status.
+ * Only counts days where the ticket was actively being worked on — "Done" days are excluded.
+ */
+export function calculateActiveDays(stateSegments: StateSegment[]): number {
+  const activeDaySet = new Set<string>();
+  const now = new Date();
+
+  for (const seg of stateSegments) {
+    if (seg.status === 'In Progress') {
+      const segStart = new Date(seg.startDate);
+      const segEnd = seg.endDate ? new Date(seg.endDate) : now;
+
+      // Normalize to start of day
+      const startDay = new Date(segStart.getFullYear(), segStart.getMonth(), segStart.getDate());
+      const endDay = new Date(segEnd.getFullYear(), segEnd.getMonth(), segEnd.getDate());
+
+      // Add each calendar day in this segment to the set
+      // Note: We DON'T include the end day because endDate represents when this segment ended
+      let currentDay = new Date(startDay);
+      while (currentDay < endDay) {
+        activeDaySet.add(currentDay.toISOString().split('T')[0]);
+        currentDay.setDate(currentDay.getDate() + 1);
+      }
+
+      // Special case: if segment has no end date (still active), OR if start and end are same day,
+      // count at least the start day
+      if (!seg.endDate || startDay.getTime() === endDay.getTime()) {
+        activeDaySet.add(startDay.toISOString().split('T')[0]);
+      }
+    }
+  }
+
+  return activeDaySet.size;
+}
 
 export const useDateUtils = () => {
   const getWeekDays = (date: Date, weekStartsOn: 0 | 1 = 1): Date[] => {

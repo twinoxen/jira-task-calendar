@@ -300,6 +300,7 @@
 import { computed } from 'vue';
 import { isSameDay, differenceInCalendarDays, startOfDay } from 'date-fns';
 import type { UserWithTickets, Ticket } from '~/types';
+import { calculateActiveDays } from '~/composables/useDateUtils';
 
 const props = defineProps<{
   userTickets: UserWithTickets[];
@@ -448,35 +449,7 @@ const processedUsers = computed<ProcessedUser[]>(() => {
           }
         }
 
-        // Days in active development — only count unique calendar days in "In Progress" status
-        // We don't count "Done" days because once complete, it's no longer active
-        const activeDaySet = new Set<string>();
-        const now = new Date();
-        for (const seg of ticket.stateSegments) {
-          if (seg.status === 'In Progress') {
-            const segStart = new Date(seg.startDate);
-            const segEnd = seg.endDate ? new Date(seg.endDate) : now;
-            
-            // Normalize to start of day
-            const startDay = new Date(segStart.getFullYear(), segStart.getMonth(), segStart.getDate());
-            const endDay = new Date(segEnd.getFullYear(), segEnd.getMonth(), segEnd.getDate());
-            
-            // Add each calendar day in this segment to the set
-            // Note: We DON'T include the end day because endDate represents when this segment ended
-            let currentDay = new Date(startDay);
-            while (currentDay < endDay) {
-              activeDaySet.add(currentDay.toISOString().split('T')[0]);
-              currentDay.setDate(currentDay.getDate() + 1);
-            }
-            
-            // Special case: if segment has no end date (still active), OR if start and end are same day,
-            // count at least the start day
-            if (!seg.endDate || startDay.getTime() === endDay.getTime()) {
-              activeDaySet.add(startDay.toISOString().split('T')[0]);
-            }
-          }
-        }
-        const daysOpen = activeDaySet.size;
+        const daysOpen = calculateActiveDays(ticket.stateSegments);
 
         // Bar color = current status color
         const barColor = statusColors[ticket.currentStatus] || '#8b5cf6';
