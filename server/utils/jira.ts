@@ -119,7 +119,7 @@ export class JiraClient {
       return 'To Do';
     }
 
-    // In Progress variations
+    // In Progress variations (including UAT, QA, testing, etc.)
     if (
       normalized === 'in progress' ||
       normalized === 'in development' ||
@@ -127,7 +127,13 @@ export class JiraClient {
       normalized === 'development' ||
       normalized === 'working' ||
       normalized === 'wip' ||
-      normalized === 'active'
+      normalized === 'active' ||
+      normalized === 'uat' ||
+      normalized === 'qa' ||
+      normalized === 'testing' ||
+      normalized === 'in review' ||
+      normalized === 'review' ||
+      normalized === 'code review'
     ) {
       return 'In Progress';
     }

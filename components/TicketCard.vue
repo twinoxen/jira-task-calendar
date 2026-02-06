@@ -116,13 +116,26 @@ defineEmits<{
 
 const { calculateTicketSpan, formatDate } = useDateUtils();
 
-// Calculate total days the ticket was/has been open
+// Calculate total days the ticket was/has been open  
+// This counts the number of days elapsed, not inclusive calendar days
 const totalDaysOpen = computed(() => {
   const start = props.ticket.startDate;
   const end = props.ticket.endDate || new Date(); // Use now if still open
-  const diffMs = end.getTime() - start.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  return diffDays;
+  
+  // Normalize to start of day to get calendar days
+  const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  
+  // Calculate the difference in milliseconds and convert to days
+  const diffMs = endDay.getTime() - startDay.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  
+  // If opened and closed on the same day, count as 1 day
+  // Otherwise, use the difference (days elapsed, not inclusive)
+  // Example: Jan 13 to Jan 13 = 0 days difference → 1 day
+  // Example: Jan 13 to Jan 14 = 1 day difference → 1 day  
+  // Example: Jan 13 to Jan 16 = 3 days difference → 3 days
+  return Math.max(diffDays, 1);
 });
 
 interface VisibleSegment {
