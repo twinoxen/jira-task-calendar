@@ -58,6 +58,9 @@ export const useTicketData = () => {
           startDate: new Date(segment.startDate),
           endDate: segment.endDate ? new Date(segment.endDate) : null,
         })),
+        issueType: ticket.issueType || 'Unknown',
+        labels: ticket.labels || [],
+        components: ticket.components || [],
       }));
 
       // Initialize empty PRs for all tickets

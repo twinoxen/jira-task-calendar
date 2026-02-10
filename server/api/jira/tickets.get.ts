@@ -59,6 +59,9 @@ export default defineEventHandler(async (event) => {
       'updated',
       'description',
       'customfield_10028', // Story points
+      'issuetype',
+      'labels',
+      'components',
     ]);
 
     // Helper function to get status color
@@ -161,6 +164,9 @@ export default defineEventHandler(async (event) => {
         prs: [], // Will be populated by the aggregation layer
         description: issue.fields.description,
         jiraUrl: `${config.jiraBaseUrl}/browse/${issue.key}`,
+        issueType: issue.fields.issuetype?.name || 'Unknown',
+        labels: issue.fields.labels || [],
+        components: (issue.fields.components || []).map((c: any) => c.name),
       };
     });
 

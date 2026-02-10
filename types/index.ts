@@ -57,6 +57,9 @@ export interface Ticket {
   prs: PullRequest[];
   description?: string;
   jiraUrl: string;
+  issueType: string;
+  labels: string[];
+  components: string[];
 }
 
 export interface UserWithTickets {
