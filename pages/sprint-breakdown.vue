@@ -5,7 +5,7 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-2xl font-bold text-gray-900">Sprint Breakdown</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Breakdown</h1>
             <p class="text-sm text-gray-500 mt-1">
               Story point allocation, ticket types &amp; cycle times
             </p>
@@ -1154,7 +1154,7 @@ const exportCSV = () => {
 
   // --- Summary section ---
   const summaryRows = [
-    ['Sprint Breakdown Report'],
+    ['Breakdown Report'],
     ['Date Range', `${formatDate(dateRange.value.start, 'MMM d, yyyy')} - ${formatDate(dateRange.value.end, 'MMM d, yyyy')}`],
     ['Project', selectedProject.value],
     [''],
