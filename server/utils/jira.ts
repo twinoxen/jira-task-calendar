@@ -45,14 +45,57 @@ export class JiraClient {
   }
 
   async searchIssues(jql: string, fields: string[] = ['*all']) {
-    const params = new URLSearchParams({
-      jql,
-      fields: fields.join(','),
-      maxResults: '100',
-      expand: 'changelog',
-    });
+    const allIssues: any[] = [];
+    const pageSize = 100;
+    let nextPageToken: string | undefined = undefined;
+    let page = 0;
 
-    return this.request<any>(`/search/jql?${params.toString()}`);
+    // Use POST /search/jql with nextPageToken cursor pagination
+    // The GET version and old /search endpoint have known pagination issues
+    while (true) {
+      page++;
+      const body: Record<string, any> = {
+        jql,
+        fields,
+        maxResults: pageSize,
+        expand: 'changelog',
+        fieldsByKeys: false,
+      };
+
+      if (nextPageToken) {
+        body.nextPageToken = nextPageToken;
+      }
+
+      const response = await this.request<any>('/search/jql', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+
+      const pageIssues = response.issues || [];
+      allIssues.push(...pageIssues);
+
+      console.log(`[JIRA] Page ${page}: got ${pageIssues.length} issues, accumulated=${allIssues.length}`);
+
+      // Stop conditions: isLast flag, no nextPageToken, or fewer results than page size
+      if (
+        response.isLast === true ||
+        !response.nextPageToken ||
+        pageIssues.length < pageSize
+      ) {
+        break;
+      }
+
+      nextPageToken = response.nextPageToken;
+
+      // Safety limit to prevent infinite loops (known JIRA API bug)
+      if (page >= 50) {
+        console.warn('[JIRA] Hit pagination safety limit of 50 pages (5000 issues)');
+        break;
+      }
+    }
+
+    console.log(`[JIRA] Pagination complete: ${allIssues.length} total issues fetched`);
+    return { issues: allIssues, total: allIssues.length };
   }
 
   async getIssue(issueIdOrKey: string) {

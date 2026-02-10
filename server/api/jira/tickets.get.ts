@@ -33,8 +33,13 @@ export default defineEventHandler(async (event) => {
       jql = boardFilter;
     }
 
-    // Add date filter - get tickets created, updated, or with status changes in date range
-    const dateFilter = `(created >= "${startDate}" OR updated >= "${startDate}" OR status changed DURING ("${startDate}", "${endDate}"))`;
+    // Date filter: capture any ticket that was relevant during the date range
+    // - created during the range
+    // - updated during the range
+    // - had a status change during the range
+    // - was still open (not Done/Closed/Resolved) at the start of the range
+    //   (catches tickets sitting in progress with no recent activity)
+    const dateFilter = `(created >= "${startDate}" OR updated >= "${startDate}" OR status changed DURING ("${startDate}", "${endDate}") OR (created <= "${endDate}" AND status NOT IN (Done, Closed, Resolved)))`;
 
     if (jql) {
       jql += ` AND ${dateFilter}`;
@@ -49,6 +54,8 @@ export default defineEventHandler(async (event) => {
     }
 
     jql += ' ORDER BY updated DESC';
+
+    console.log(`[JIRA] Fetching tickets with JQL: ${jql}`);
 
     // Fetch issues
     const response = await jiraClient.searchIssues(jql, [
@@ -170,19 +177,11 @@ export default defineEventHandler(async (event) => {
       };
     });
 
-    // Filter out tickets that have only ever been in "To Do" status
-    // Keep tickets that have had at least one status other than "To Do"
-    const filteredTickets = tickets.filter((ticket) => {
-      const hasNonToDoStatus =
-        ticket.statusHistory.length > 0
-          ? ticket.statusHistory.some((sh) => sh.status !== 'To Do')
-          : ticket.currentStatus !== 'To Do';
-      return hasNonToDoStatus;
-    });
+    console.log(`[JIRA] Fetched ${tickets.length} tickets from API`);
 
     return {
-      tickets: filteredTickets,
-      total: filteredTickets.length,
+      tickets,
+      total: tickets.length,
     };
   } catch (error: any) {
     console.error('JIRA API Error:', error);
