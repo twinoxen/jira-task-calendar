@@ -100,7 +100,7 @@
             >
             <input
               type="date"
-              :value="customStartDate.toISOString().split('T')[0]"
+              :value="formatLocalDate(customStartDate)"
               @change="handleStartDateChange"
               class="block rounded-lg border-2 border-gray-300 bg-white shadow-sm py-2 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
             />
@@ -111,7 +111,7 @@
             >
             <input
               type="date"
-              :value="customEndDate.toISOString().split('T')[0]"
+              :value="formatLocalDate(customEndDate)"
               @change="handleEndDateChange"
               class="block rounded-lg border-2 border-gray-300 bg-white shadow-sm py-2 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
             />
@@ -939,13 +939,27 @@ const goToToday = () => {
   currentDate.value = new Date();
 };
 
+// Format a Date as "YYYY-MM-DD" using local time (not UTC)
+const formatLocalDate = (d: Date): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// Parse a "YYYY-MM-DD" string as local time (not UTC)
+const parseLocalDate = (dateStr: string): Date => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
 const handleStartDateChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  customStartDate.value = new Date(target.value);
+  customStartDate.value = parseLocalDate(target.value);
 };
 const handleEndDateChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
-  customEndDate.value = new Date(target.value);
+  customEndDate.value = parseLocalDate(target.value);
 };
 
 // --- Project selection (shared via composable) ---
