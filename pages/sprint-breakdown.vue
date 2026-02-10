@@ -212,37 +212,8 @@
 
         <!-- Row 2: All filter columns -->
         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <!-- Column 1: Project + Team Members stacked -->
-          <div class="space-y-4">
-            <!-- JIRA Project Selector -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">
-                Project
-              </label>
-              <select
-                v-model="selectedProject"
-                :disabled="loadingProjects || availableProjects.length === 0"
-                class="block w-full rounded-lg border-2 border-gray-300 bg-white shadow-sm py-2.5 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-              >
-                <option value="" disabled>
-                  {{
-                    loadingProjects
-                      ? 'Loading...'
-                      : availableProjects.length === 0
-                      ? 'No projects found'
-                      : 'Select project'
-                  }}
-                </option>
-                <option
-                  v-for="project in availableProjects"
-                  :key="project.key"
-                  :value="project.key"
-                >
-                  {{ project.name }} ({{ project.key }})
-                </option>
-              </select>
-            </div>
-
+          <!-- Column 1: Team Members -->
+          <div>
             <!-- Team Member Filter -->
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">
@@ -612,74 +583,96 @@
           </div>
         </div>
 
-        <!-- Ticket Type Breakdown -->
-        <div
-          class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6"
-        >
-          <h3 class="text-lg font-semibold text-gray-900 mb-4">
-            Breakdown by Ticket Type
-          </h3>
+        <!-- Breakdown Sections: 2-column grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div
+            v-for="section in breakdownSections"
+            :key="section.key"
+            class="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+          >
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">
+              {{ section.title }}
+            </h3>
 
-          <div v-if="typeBreakdown.length === 0" class="text-sm text-gray-500">
-            No ticket data for this period.
-          </div>
-
-          <div v-else class="space-y-4">
-            <div
-              v-for="entry in typeBreakdown"
-              :key="entry.type"
-              class="border border-gray-100 rounded-lg p-4"
-            >
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-3">
-                  <span
-                    class="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold"
-                    :class="typeColorClass(entry.type)"
-                  >
-                    {{ entry.type }}
-                  </span>
-                  <span class="text-sm text-gray-500">
-                    {{ entry.count }}
-                    {{ entry.count === 1 ? 'ticket' : 'tickets' }}
-                  </span>
-                </div>
-                <div class="flex items-center gap-6 text-sm">
-                  <div class="text-right">
-                    <span class="text-gray-500">Points:</span>
-                    <span class="font-semibold text-gray-900 ml-1">{{
-                      entry.points
-                    }}</span>
-                  </div>
-                  <div class="text-right">
-                    <span class="text-gray-500">Completed:</span>
-                    <span class="font-semibold text-gray-900 ml-1">{{
-                      entry.completedCount
-                    }}</span>
-                  </div>
-                  <div class="text-right min-w-[120px]">
-                    <span class="text-gray-500">Avg Cycle:</span>
-                    <span class="font-semibold text-gray-900 ml-1">{{
-                      entry.avgCycleTimeDays !== null
-                        ? entry.avgCycleTimeDays + 'd'
-                        : '--'
-                    }}</span>
-                  </div>
-                </div>
-              </div>
-              <!-- Proportion bar -->
-              <div class="flex items-center gap-3">
-                <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                  <div
-                    class="h-full rounded-full transition-all duration-500"
-                    :class="typeBarColorClass(entry.type)"
-                    :style="{ width: entry.percentOfPoints + '%' }"
-                  ></div>
-                </div>
-                <span class="text-sm font-medium text-gray-600 w-12 text-right">
-                  {{ entry.percentOfPoints }}%
-                </span>
-              </div>
+            <div v-if="section.data.length === 0" class="text-sm text-gray-500 py-8 text-center">
+              No data for this period.
             </div>
+
+            <template v-else>
+              <!-- Row 1: Donut chart centered -->
+              <div class="flex justify-center mb-5">
+                <div class="relative">
+                  <svg width="180" height="180" viewBox="0 0 180 180">
+                    <circle cx="90" cy="90" r="70" fill="none" stroke="#f3f4f6" stroke-width="24" />
+                    <circle
+                      v-for="(seg, i) in donutSegments(section.data, section.colors)"
+                      :key="i"
+                      cx="90" cy="90" r="70"
+                      fill="none"
+                      :stroke="seg.color"
+                      :stroke-width="hoveredSection === section.key && hoveredIndex === i ? 28 : 24"
+                      :stroke-dasharray="seg.dashArray"
+                      :stroke-dashoffset="seg.dashOffset"
+                      stroke-linecap="butt"
+                      class="transition-all duration-200"
+                      :style="{
+                        transform: 'rotate(-90deg)',
+                        transformOrigin: '90px 90px',
+                        opacity: hoveredSection === section.key && hoveredIndex !== null && hoveredIndex !== i ? 0.35 : 1,
+                      }"
+                    />
+                  </svg>
+                  <!-- Center label -->
+                  <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-xl font-bold text-gray-900">{{ section.totalPoints }}</span>
+                    <span class="text-xs text-gray-500">pts</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Row 2: Full-width breakdown table -->
+              <div class="space-y-0">
+                <div
+                  v-for="(entry, i) in section.data"
+                  :key="entry.name"
+                  class="flex items-center gap-3 py-2 px-2 -mx-2 rounded-md border-b border-gray-50 last:border-0 cursor-default transition-colors duration-150"
+                  :class="hoveredSection === section.key && hoveredIndex === i ? 'bg-gray-50' : ''"
+                  @mouseenter="hoveredSection = section.key; hoveredIndex = i"
+                  @mouseleave="hoveredSection = null; hoveredIndex = null"
+                >
+                  <!-- Color dot -->
+                  <span
+                    class="w-3 h-3 rounded-sm flex-shrink-0"
+                    :style="{ backgroundColor: section.colors[i % section.colors.length] }"
+                  ></span>
+                  <!-- Name + ticket count -->
+                  <div class="min-w-0 flex-1">
+                    <span class="text-sm font-medium text-gray-900">{{ entry.name }}</span>
+                    <span class="text-xs text-gray-400 ml-2">
+                      {{ entry.count }} {{ entry.count === 1 ? 'ticket' : 'tickets' }}
+                    </span>
+                  </div>
+                  <!-- Stats -->
+                  <div class="flex items-center gap-4 text-xs flex-shrink-0">
+                    <span class="font-semibold text-gray-900 min-w-[32px] text-right">{{ entry.percentOfPoints }}%</span>
+                    <span>
+                      <span class="text-gray-400">Pts:</span>
+                      <span class="font-semibold text-gray-900 ml-0.5">{{ entry.points }}</span>
+                    </span>
+                    <span>
+                      <span class="text-gray-400">Done:</span>
+                      <span class="font-semibold text-gray-900 ml-0.5">{{ entry.completedCount }}</span>
+                    </span>
+                    <span class="min-w-[65px] text-right">
+                      <span class="text-gray-400">Cycle:</span>
+                      <span class="font-semibold text-gray-900 ml-0.5">{{
+                        entry.avgCycleTimeDays !== null ? entry.avgCycleTimeDays + 'd' : '--'
+                      }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -955,27 +948,8 @@ const handleEndDateChange = (event: Event) => {
   customEndDate.value = new Date(target.value);
 };
 
-// --- Project selection ---
-const availableProjects = ref<Array<{ key: string; name: string; id: string }>>(
-  []
-);
-const selectedProject = ref<string>('');
-const loadingProjects = ref(false);
-
-const fetchProjects = async () => {
-  loadingProjects.value = true;
-  try {
-    const response = (await $fetch('/api/jira/projects')) as any;
-    availableProjects.value = response.projects || [];
-    if (availableProjects.value.length > 0 && !selectedProject.value) {
-      selectedProject.value = availableProjects.value[0].key;
-    }
-  } catch (err) {
-    console.error('Failed to fetch projects:', err);
-  } finally {
-    loadingProjects.value = false;
-  }
-};
+// --- Project selection (shared via composable) ---
+const { selectedProject } = useProjectSelection();
 
 // --- User filter ---
 const selectedUserIds = ref<string[]>([]);
@@ -1015,6 +989,9 @@ const {
   completedPoints,
   avgCycleTime,
   typeBreakdown,
+  memberBreakdown,
+  labelBreakdown,
+  componentBreakdown,
   pointsBreakdown,
 } = useSprintBreakdown(userFilteredTickets);
 
@@ -1124,6 +1101,76 @@ const statusColorClass = (status: string): string => {
   return 'bg-purple-100 text-purple-800';
 };
 
+const memberBadgeClass = (_name: string): string => 'bg-blue-50 text-blue-800';
+const labelBadgeClass = (_label: string): string => 'bg-gray-100 text-gray-800';
+const componentBadgeClass = (_comp: string): string => 'bg-teal-50 text-teal-800';
+
+// --- Donut chart colors ---
+const TYPE_COLORS = ['#3b82f6', '#ef4444', '#8b5cf6', '#6b7280', '#6366f1', '#f97316', '#14b8a6', '#ec4899'];
+const MEMBER_COLORS = ['#3b82f6', '#6366f1', '#8b5cf6', '#06b6d4', '#0ea5e9', '#2563eb', '#7c3aed', '#4f46e5'];
+const LABEL_COLORS = ['#f59e0b', '#d97706', '#b45309', '#92400e', '#fbbf24', '#f97316', '#ea580c', '#c2410c'];
+const COMPONENT_COLORS = ['#14b8a6', '#0d9488', '#0f766e', '#115e59', '#2dd4bf', '#5eead4', '#99f6e4', '#06b6d4'];
+
+// --- Hover state for breakdown sections ---
+const hoveredSection = ref<string | null>(null);
+const hoveredIndex = ref<number | null>(null);
+
+// --- Donut segment calculator ---
+const donutSegments = (
+  data: Array<{ percentOfPoints: number }>,
+  colors: string[]
+) => {
+  const circumference = 2 * Math.PI * 70; // r=70
+  let cumulativeOffset = 0;
+  return data.map((entry, i) => {
+    const segLen = (entry.percentOfPoints / 100) * circumference;
+    const gap = data.length > 1 ? 2 : 0;
+    const seg = {
+      color: colors[i % colors.length],
+      dashArray: `${Math.max(segLen - gap, 0)} ${circumference - Math.max(segLen - gap, 0)}`,
+      dashOffset: `${-cumulativeOffset}`,
+    };
+    cumulativeOffset += segLen;
+    return seg;
+  });
+};
+
+// --- Breakdown sections ---
+const breakdownSections = computed(() => [
+  {
+    key: 'type',
+    title: 'Breakdown by Ticket Type',
+    data: typeBreakdown.value,
+    badgeClass: typeColorClass,
+    colors: TYPE_COLORS,
+    totalPoints: typeBreakdown.value.reduce((s: number, e: { points: number }) => s + e.points, 0),
+  },
+  {
+    key: 'member',
+    title: 'Breakdown by Team Member',
+    data: memberBreakdown.value,
+    badgeClass: memberBadgeClass,
+    colors: MEMBER_COLORS,
+    totalPoints: memberBreakdown.value.reduce((s: number, e: { points: number }) => s + e.points, 0),
+  },
+  {
+    key: 'label',
+    title: 'Breakdown by Label',
+    data: labelBreakdown.value,
+    badgeClass: labelBadgeClass,
+    colors: LABEL_COLORS,
+    totalPoints: labelBreakdown.value.reduce((s: number, e: { points: number }) => s + e.points, 0),
+  },
+  {
+    key: 'component',
+    title: 'Breakdown by Component',
+    data: componentBreakdown.value,
+    badgeClass: componentBadgeClass,
+    colors: COMPONENT_COLORS,
+    totalPoints: componentBreakdown.value.reduce((s: number, e: { points: number }) => s + e.points, 0),
+  },
+]);
+
 // --- Ticket modal ---
 const isModalOpen = ref(false);
 const selectedTicket = ref<Ticket | null>(null);
@@ -1179,17 +1226,22 @@ const exportCSV = () => {
     String(entry.percentOfTotal) + '%',
   ]);
 
-  // --- Type breakdown section ---
-  const typeHeaderRow = ['TYPE BREAKDOWN'];
-  const typeColumns = ['Type', 'Tickets', 'Story Points', '% of Points', 'Completed', 'Avg Cycle Time (days)'];
-  const typeRows = typeBreakdown.value.map((entry: { type: string; count: number; points: number; percentOfPoints: number; completedCount: number; avgCycleTimeDays: number | null }) => [
-    entry.type,
-    String(entry.count),
-    String(entry.points),
-    String(entry.percentOfPoints) + '%',
-    String(entry.completedCount),
-    entry.avgCycleTimeDays !== null ? String(entry.avgCycleTimeDays) : 'N/A',
-  ]);
+  // --- Breakdown sections helper ---
+  const breakdownColumns = ['Name', 'Tickets', 'Story Points', '% of Points', 'Completed', 'Avg Cycle Time (days)'];
+  const formatBreakdownRows = (data: Array<{ name: string; count: number; points: number; percentOfPoints: number; completedCount: number; avgCycleTimeDays: number | null }>): string[][] =>
+    data.map((entry) => [
+      entry.name,
+      String(entry.count),
+      String(entry.points),
+      String(entry.percentOfPoints) + '%',
+      String(entry.completedCount),
+      entry.avgCycleTimeDays !== null ? String(entry.avgCycleTimeDays) : 'N/A',
+    ]);
+
+  const typeRows = formatBreakdownRows(typeBreakdown.value);
+  const memberRows = formatBreakdownRows(memberBreakdown.value);
+  const labelRows = formatBreakdownRows(labelBreakdown.value);
+  const componentRows = formatBreakdownRows(componentBreakdown.value);
 
   // --- Ticket list section ---
   const ticketColumns = ['Key', 'Title', 'Type', 'Points', 'Status', 'Cycle Time (days)', 'Labels', 'Components', 'Assignee'];
@@ -1212,9 +1264,21 @@ const exportCSV = () => {
     pointsColumns,
     ...pointsRows,
     [''],
-    typeHeaderRow,
-    typeColumns,
+    ['BREAKDOWN BY TICKET TYPE'],
+    breakdownColumns,
     ...typeRows,
+    [''],
+    ['BREAKDOWN BY TEAM MEMBER'],
+    breakdownColumns,
+    ...memberRows,
+    [''],
+    ['BREAKDOWN BY LABEL'],
+    breakdownColumns,
+    ...labelRows,
+    [''],
+    ['BREAKDOWN BY COMPONENT'],
+    breakdownColumns,
+    ...componentRows,
     [''],
     ['ALL TICKETS'],
     ticketColumns,
@@ -1260,7 +1324,8 @@ watch(selectedProject, async () => {
 });
 
 onMounted(async () => {
-  await fetchProjects();
-  await refreshData();
+  if (selectedProject.value) {
+    await refreshData();
+  }
 });
 </script>

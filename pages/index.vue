@@ -163,36 +163,7 @@
         <h3 class="text-sm font-semibold text-gray-700 mb-3">
           Settings & Statistics
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <!-- JIRA Project Selector -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-              JIRA Project
-            </label>
-            <select
-              v-model="selectedProject"
-              :disabled="loadingProjects || availableProjects.length === 0"
-              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            >
-              <option value="" disabled>
-                {{
-                  loadingProjects
-                    ? 'Loading...'
-                    : availableProjects.length === 0
-                    ? 'No projects found'
-                    : 'Select project'
-                }}
-              </option>
-              <option
-                v-for="project in availableProjects"
-                :key="project.key"
-                :value="project.key"
-              >
-                {{ project.name }} ({{ project.key }})
-              </option>
-            </select>
-          </div>
-
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <!-- User Filter -->
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -405,12 +376,8 @@ const viewMode = ref<ViewMode>('1week');
 const customStartDate = ref<Date>(new Date());
 const customEndDate = ref<Date>(new Date());
 
-// JIRA project selection
-const availableProjects = ref<Array<{ key: string; name: string; id: string }>>(
-  []
-);
-const selectedProject = ref<string>('');
-const loadingProjects = ref(false);
+// JIRA project selection (shared via composable)
+const { selectedProject } = useProjectSelection();
 
 // Current date state
 const currentDate = ref(new Date());
@@ -528,24 +495,6 @@ const refreshData = async () => {
   );
 };
 
-// Fetch available projects
-const fetchProjects = async () => {
-  loadingProjects.value = true;
-  try {
-    const response = (await $fetch('/api/jira/projects')) as any;
-    availableProjects.value = response.projects || [];
-
-    // Auto-select first project if none selected
-    if (availableProjects.value.length > 0 && !selectedProject.value) {
-      selectedProject.value = availableProjects.value[0].key;
-    }
-  } catch (err) {
-    console.error('Failed to fetch projects:', err);
-  } finally {
-    loadingProjects.value = false;
-  }
-};
-
 // Ticket modal
 const loadingPRs = ref(false);
 
@@ -585,7 +534,9 @@ watch(selectedProject, async () => {
 
 // Initial data load
 onMounted(async () => {
-  await fetchProjects();
-  await refreshData();
+  // Only fetch if project is already selected (set by app.vue)
+  if (selectedProject.value) {
+    await refreshData();
+  }
 });
 </script>

@@ -8,14 +8,17 @@ export interface PointsSizeEntry {
   percentOfTotal: number;
 }
 
-export interface TypeBreakdownEntry {
-  type: string;
+export interface BreakdownEntry {
+  name: string;
   count: number;
   points: number;
   percentOfPoints: number;
   completedCount: number;
   avgCycleTimeDays: number | null;
 }
+
+// Keep for backwards compat in CSV export type annotations
+export type TypeBreakdownEntry = BreakdownEntry;
 
 /**
  * Compute cycle time in calendar days for a ticket.
@@ -172,38 +175,40 @@ export const useSprintBreakdown = (tickets: Ref<Ticket[]>) => {
     return Math.round((sum / cycleTimes.length) * 10) / 10;
   });
 
-  // Type breakdown
-  const typeBreakdown = computed<TypeBreakdownEntry[]>(() => {
-    const typeMap = new Map<
+  // Generic breakdown builder: groups tickets by a key extractor and computes stats
+  const buildBreakdown = (
+    keyExtractor: (ticket: Ticket) => string[]
+  ): BreakdownEntry[] => {
+    const map = new Map<
       string,
       { count: number; points: number; completedCount: number; cycleTimes: number[] }
     >();
 
     for (const ticket of filteredTickets.value) {
-      const type = ticket.issueType || 'Unknown';
+      const keys = keyExtractor(ticket);
+      for (const key of keys) {
+        if (!map.has(key)) {
+          map.set(key, { count: 0, points: 0, completedCount: 0, cycleTimes: [] });
+        }
+        const entry = map.get(key)!;
+        entry.count++;
+        entry.points += ticket.points || 0;
 
-      if (!typeMap.has(type)) {
-        typeMap.set(type, { count: 0, points: 0, completedCount: 0, cycleTimes: [] });
-      }
-
-      const entry = typeMap.get(type)!;
-      entry.count++;
-      entry.points += ticket.points || 0;
-
-      if (ticket.currentStatus === 'Done') {
-        entry.completedCount++;
-        const ct = getCycleTimeDays(ticket);
-        if (ct !== null) {
-          entry.cycleTimes.push(ct);
+        if (ticket.currentStatus === 'Done') {
+          entry.completedCount++;
+          const ct = getCycleTimeDays(ticket);
+          if (ct !== null) {
+            entry.cycleTimes.push(ct);
+          }
         }
       }
     }
 
-    const total = totalPoints.value || 1; // avoid division by zero
+    const total = totalPoints.value || 1;
 
-    return Array.from(typeMap.entries())
-      .map(([type, data]) => ({
-        type,
+    return Array.from(map.entries())
+      .map(([name, data]) => ({
+        name,
         count: data.count,
         points: data.points,
         percentOfPoints: Math.round((data.points / total) * 100),
@@ -216,7 +221,27 @@ export const useSprintBreakdown = (tickets: Ref<Ticket[]>) => {
             : null,
       }))
       .sort((a, b) => b.points - a.points);
-  });
+  };
+
+  // Breakdown by ticket type
+  const typeBreakdown = computed<BreakdownEntry[]>(() =>
+    buildBreakdown((t) => [t.issueType || 'Unknown'])
+  );
+
+  // Breakdown by team member
+  const memberBreakdown = computed<BreakdownEntry[]>(() =>
+    buildBreakdown((t) => [t.assignee?.name || 'Unassigned'])
+  );
+
+  // Breakdown by label (a ticket with multiple labels appears in each)
+  const labelBreakdown = computed<BreakdownEntry[]>(() =>
+    buildBreakdown((t) => (t.labels && t.labels.length > 0) ? t.labels : ['No Label'])
+  );
+
+  // Breakdown by component (a ticket with multiple components appears in each)
+  const componentBreakdown = computed<BreakdownEntry[]>(() =>
+    buildBreakdown((t) => (t.components && t.components.length > 0) ? t.components : ['No Component'])
+  );
 
   // Points size distribution (how many tickets are 1s, 2s, 3s, 5s, etc.)
   const pointsBreakdown = computed<PointsSizeEntry[]>(() => {
@@ -258,6 +283,9 @@ export const useSprintBreakdown = (tickets: Ref<Ticket[]>) => {
     completedPoints,
     avgCycleTime,
     typeBreakdown,
+    memberBreakdown,
+    labelBreakdown,
+    componentBreakdown,
     pointsBreakdown,
     getCycleTimeDays,
   };
