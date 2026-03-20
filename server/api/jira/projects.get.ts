@@ -12,6 +12,7 @@ export default defineEventHandler(async () => {
 
   try {
     const jiraClient = createJiraClient(config);
+    await jiraClient.verifyAuth();
     const projects = await jiraClient.getProjects();
 
     return {

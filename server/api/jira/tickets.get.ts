@@ -22,6 +22,8 @@ export default defineEventHandler(async (event) => {
   try {
     const jiraClient = createJiraClient(config);
 
+    await jiraClient.verifyAuth();
+
     // Build JQL query - filter by project
     let jql = '';
 

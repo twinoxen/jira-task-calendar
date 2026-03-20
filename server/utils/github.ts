@@ -13,14 +13,18 @@ export class GitHubClient {
     this.repos = repos ? repos.split(',').map((r) => r.trim()) : [];
   }
 
-  async searchPullRequests(since: string, repos?: string[]): Promise<any[]> {
+  async searchPullRequests(
+    since: string,
+    repos?: string[],
+    state: 'open' | 'closed' | 'all' = 'all'
+  ): Promise<any[]> {
     const targetRepos = repos || this.repos;
     const allPRs: any[] = [];
 
     if (targetRepos.length === 0) {
-      // Search across the entire org
       const sinceDate = new Date(since).toISOString();
-      const query = `org:${this.org} is:pr created:>=${sinceDate}`;
+      const stateFilter = state !== 'all' ? ` is:${state}` : '';
+      const query = `org:${this.org} is:pr created:>=${sinceDate}${stateFilter}`;
 
       try {
         const response = await this.octokit.search.issuesAndPullRequests({
@@ -37,13 +41,12 @@ export class GitHubClient {
       }
     }
 
-    // Search specific repos
     for (const repo of targetRepos) {
       try {
         const response = await this.octokit.pulls.list({
           owner: this.org,
           repo,
-          state: 'all',
+          state,
           sort: 'created',
           direction: 'desc',
           per_page: 100,

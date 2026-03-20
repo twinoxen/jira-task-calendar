@@ -7,6 +7,8 @@ const loadingProjects = ref(false);
 const projectsFetched = ref(false);
 
 export const useProjectSelection = () => {
+  const { setError: setGlobalError } = useGlobalError();
+
   const fetchProjects = async () => {
     // Only fetch once
     if (projectsFetched.value) return;
@@ -23,6 +25,7 @@ export const useProjectSelection = () => {
 
       projectsFetched.value = true;
     } catch (err) {
+      setGlobalError(err);
       console.error('Failed to fetch projects:', err);
     } finally {
       loadingProjects.value = false;

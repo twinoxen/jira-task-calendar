@@ -6,6 +6,7 @@ export const useTicketData = () => {
   const pullRequests = ref<PullRequest[]>([]);
   const loading = ref(false);
   const error = ref<Error | null>(null);
+  const { setError: setGlobalError, clearError: clearGlobalError } = useGlobalError();
 
   const fetchData = async (
     startDate: Date,
@@ -15,6 +16,7 @@ export const useTicketData = () => {
   ) => {
     loading.value = true;
     error.value = null;
+    clearGlobalError();
 
     try {
       // Format dates for API
@@ -69,6 +71,7 @@ export const useTicketData = () => {
       }
     } catch (err: any) {
       error.value = err;
+      setGlobalError(err);
       console.error('Error fetching data:', err);
     } finally {
       loading.value = false;

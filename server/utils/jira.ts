@@ -102,6 +102,26 @@ export class JiraClient {
     return this.request<any>(`/issue/${issueIdOrKey}?expand=changelog`);
   }
 
+  async verifyAuth() {
+    const response = await fetch(`${this.config.baseUrl}/rest/api/3/myself`, {
+      headers: {
+        Authorization: this.authHeader,
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(
+        `Jira authentication failed (${response.status}). Your API token may be expired or invalid. ` +
+          `Generate a new token at https://id.atlassian.com/manage-profile/security/api-tokens and update JIRA_API_TOKEN in your .env file.`
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(`Jira auth check failed: ${response.status}`);
+    }
+  }
+
   async getUsers(query: string = '') {
     const params = new URLSearchParams({
       query,
