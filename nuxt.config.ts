@@ -19,7 +19,7 @@ export default defineNuxtConfig({
 
     // Public keys (exposed to client)
     public: {
-      appName: 'JIRA/GitHub Grind Analyzer',
+      appName: 'Team Tempo',
     },
   },
 });

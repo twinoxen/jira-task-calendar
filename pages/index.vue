@@ -6,7 +6,7 @@
         <div class="flex items-center justify-between">
           <div>
             <h1 class="text-2xl font-bold text-gray-900">
-              JIRA/GitHub Grind Analyzer
+              Team Tempo
             </h1>
             <p class="text-sm text-gray-500 mt-1">
               Track team productivity and ticket progress
