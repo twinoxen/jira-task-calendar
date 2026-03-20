@@ -103,8 +103,8 @@
           <!-- Spacer -->
           <div class="flex-1"></div>
 
-          <!-- Project selector -->
-          <div class="flex items-center gap-2">
+          <!-- Project selector (not relevant on Open PRs page) -->
+          <div v-if="$route.path !== '/open-prs'" class="flex items-center gap-2">
             <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">
               Project
             </label>
