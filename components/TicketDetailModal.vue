@@ -166,8 +166,26 @@
                         class="absolute left-[-18px] top-3 w-0.5 h-full bg-gray-200"
                       ></div>
                       <div class="text-sm">
-                        <div class="font-medium text-gray-900">
-                          {{ change.status }}
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-medium text-gray-900">
+                            {{ change.status }}
+                          </span>
+                          <span
+                            v-if="statusDurations[index]"
+                            class="px-2 py-0.5 rounded-full text-xs font-medium"
+                            :class="
+                              statusDurations[index]?.ongoing
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-gray-100 text-gray-700'
+                            "
+                            :title="
+                              statusDurations[index]?.ongoing
+                                ? 'Time in current status (still ongoing)'
+                                : 'Time spent in this status'
+                            "
+                          >
+                            {{ statusDurations[index]?.label }}
+                          </span>
                         </div>
                         <div class="text-xs text-gray-500">
                           {{
@@ -368,7 +386,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { Ticket } from '~/types';
+import type { Ticket, StatusChange } from '~/types';
 import { calculateActiveDays } from '~/composables/useDateUtils';
 
 const props = defineProps<{
@@ -391,6 +409,50 @@ const statusColor = computed(() => {
 const activeDays = computed(() => {
   if (!props.ticket) return 0;
   return calculateActiveDays(props.ticket.stateSegments);
+});
+
+// Format a duration in milliseconds as a human-readable label
+// (e.g. "3d", "5d 2h", "4h", "12m"). Used for status-history chips.
+const formatDuration = (ms: number): string => {
+  if (ms <= 0) return '< 1m';
+  const totalMinutes = Math.floor(ms / (1000 * 60));
+  if (totalMinutes < 60) {
+    return `${totalMinutes}m`;
+  }
+  const totalHours = Math.floor(ms / (1000 * 60 * 60));
+  if (totalHours < 24) {
+    return `${totalHours}h`;
+  }
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours - days * 24;
+  if (days < 7 && hours > 0) {
+    return `${days}d ${hours}h`;
+  }
+  return `${days} ${days === 1 ? 'day' : 'days'}`;
+};
+
+// Compute how long the ticket spent in each status, parallel to statusHistory.
+// For all entries except the last, duration runs until the next status change.
+// For the last entry, duration runs until "now" and is flagged as ongoing.
+const statusDurations = computed<
+  { label: string; ms: number; ongoing: boolean }[]
+>(() => {
+  if (!props.ticket || props.ticket.statusHistory.length === 0) return [];
+  const history = props.ticket.statusHistory;
+  const now = Date.now();
+  return history.map((change: StatusChange, i: number) => {
+    const start = new Date(change.timestamp).getTime();
+    const isLast = i === history.length - 1;
+    const end = isLast
+      ? now
+      : new Date(history[i + 1].timestamp).getTime();
+    const ms = Math.max(0, end - start);
+    return {
+      label: formatDuration(ms),
+      ms,
+      ongoing: isLast,
+    };
+  });
 });
 
 const getUserInitials = (name: string): string => {
