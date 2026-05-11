@@ -5,7 +5,29 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-2xl font-bold text-gray-900">Open PRs</h1>
+            <div class="flex items-center gap-3">
+              <h1 class="text-2xl font-bold text-gray-900">Open PRs</h1>
+              <span
+                v-if="!loading && leaderboard.length > 0"
+                class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-700"
+                :title="`${totalOpenPRs} open across ${leaderboard.length} ${leaderboard.length === 1 ? 'author' : 'authors'}`"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                  />
+                </svg>
+                {{ totalOpenPRs }} total open
+              </span>
+            </div>
             <p class="text-sm text-gray-500 mt-1">
               Leaderboard of open pull requests across the organization
             </p>
@@ -15,7 +37,7 @@
               v-if="!loading && leaderboard.length > 0"
               class="text-sm text-gray-500"
             >
-              {{ totalOpenPRs }} open across {{ leaderboard.length }}
+              across {{ leaderboard.length }}
               {{ leaderboard.length === 1 ? 'author' : 'authors' }}
             </div>
             <button
